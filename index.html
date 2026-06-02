@@ -2,161 +2,179 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Zombies R US 3D</title>
+<title>Zombies R US</title>
 <style>
-body{margin:0;overflow:hidden;background:#000;font-family:Arial;color:white;text-align:center}
-#hud{position:fixed;top:10px;left:0;width:100%;z-index:5;font-size:18px}
-#controls{position:fixed;bottom:15px;width:100%;z-index:5}
-button{font-size:24px;padding:18px;margin:6px;border-radius:14px;border:0;background:#f5c542}
-#attack{background:#ff6b35}
+body{margin:0;background:#101010;color:white;font-family:monospace;text-align:center;overflow:hidden;touch-action:none}
+h1{font-size:26px;margin:8px;color:#ffd84a;text-shadow:3px 3px #000}
+canvas{image-rendering:pixelated;background:#2f7d32;border:6px solid #ffd84a;width:96vw;height:62vh}
+#hud{font-size:16px;margin:4px;color:#fff}
+#controls{position:fixed;bottom:18px;width:100%;display:flex;justify-content:space-around;align-items:center}
+#stick{width:130px;height:130px;border-radius:50%;background:#333;border:4px solid #ffd84a;position:relative}
+#knob{width:50px;height:50px;border-radius:50%;background:#ffd84a;position:absolute;left:40px;top:40px}
+#attack{width:120px;height:120px;border-radius:50%;background:#b82020;color:white;font-size:22px;border:5px solid #ffd84a}
+button{font-family:monospace}
 </style>
 </head>
 <body>
 
-<div id="hud">🧟 Zombies R US 3D 🍗🐉<br><span id="stats">Tap START</span></div>
+<h1>🧟 Zombies R US 🍗🐉</h1>
+<div id="hud">Tap START</div>
+<canvas id="game" width="320" height="220"></canvas>
 
 <div id="controls">
-  <div><button ontouchstart="up=true" ontouchend="up=false">⬆️</button></div>
-  <button ontouchstart="left=true" ontouchend="left=false">⬅️</button>
-  <button onclick="startGame()">START</button>
-  <button ontouchstart="right=true" ontouchend="right=false">➡️</button>
-  <div>
-    <button ontouchstart="down=true" ontouchend="down=false">⬇️</button>
-    <button id="attack" onclick="attack()">🍗 ATTACK</button>
-  </div>
+  <div id="stick"><div id="knob"></div></div>
+  <button id="start">START</button>
+  <button id="attack">ATTACK</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-
 <script>
-let scene,camera,renderer,player,dragon;
-let chickens=[],zombies=[];
-let health=100,chicken=0,dragonHealth=100;
-let up=false,down=false,left=false,right=false,playing=false;
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const hud=document.getElementById("hud");
+const stick=document.getElementById("stick");
+const knob=document.getElementById("knob");
 
-init();
+let joyX=0, joyY=0, playing=false;
+let player, dragon, chickens=[], zombies=[], fireballs=[];
+let score=0;
 
-function init(){
-  scene=new THREE.Scene();
-  scene.background=new THREE.Color(0x102515);
-
-  camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,1000);
-  camera.position.set(0,8,12);
-  camera.lookAt(0,0,0);
-
-  renderer=new THREE.WebGLRenderer({antialias:true});
-  renderer.setSize(innerWidth,innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  const light=new THREE.DirectionalLight(0xffffff,1);
-  light.position.set(5,10,5);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0x888888));
-
-  const ground=new THREE.Mesh(
-    new THREE.PlaneGeometry(40,40),
-    new THREE.MeshStandardMaterial({color:0x225522})
-  );
-  ground.rotation.x=-Math.PI/2;
-  scene.add(ground);
-
-  animate();
+function reset(){
+  player={x:35,y:110,w:14,h:18,hp:100,chicken:0,cool:0};
+  dragon={x:265,y:85,w:34,h:34,hp:120,cool:0};
+  chickens=[]; zombies=[]; fireballs=[]; score=0; playing=true;
+  for(let i=0;i<10;i++) chickens.push({x:50+Math.random()*180,y:35+Math.random()*140,w:10,h:10});
+  for(let i=0;i<5;i++) zombies.push({x:90+Math.random()*130,y:30+Math.random()*150,w:14,h:18,s:.45,cool:0});
 }
 
-function makeBox(color,x,z,size=1){
-  const obj=new THREE.Mesh(
-    new THREE.BoxGeometry(size,size,size),
-    new THREE.MeshStandardMaterial({color})
-  );
-  obj.position.set(x,size/2,z);
-  scene.add(obj);
-  return obj;
-}
-
-function startGame(){
-  chickens.forEach(o=>scene.remove(o));
-  zombies.forEach(o=>scene.remove(o));
-  if(player)scene.remove(player);
-  if(dragon)scene.remove(dragon);
-
-  chickens=[]; zombies=[];
-  health=100; chicken=0; dragonHealth=100; playing=true;
-
-  player=makeBox(0x44ff44,-8,0,1);
-  dragon=makeBox(0xff3333,8,0,2);
-
-  for(let i=0;i<10;i++){
-    chickens.push(makeBox(0xffcc33,Math.random()*14-7,Math.random()*14-7,.5));
-  }
-
-  for(let i=0;i<5;i++){
-    zombies.push(makeBox(0x66aa66,Math.random()*10-5,Math.random()*10-5,1));
-  }
-}
+document.getElementById("start").onclick=reset;
+document.getElementById("attack").onclick=attack;
 
 function attack(){
-  if(!playing||chicken<=0)return;
-  let d=player.position.distanceTo(dragon.position);
-  if(d<4){
-    chicken--;
-    dragonHealth-=20;
-    dragon.scale.set(1+.02*dragonHealth,1+.02*dragonHealth,1+.02*dragonHealth);
-    if(dragonHealth<=0){
-      playing=false;
-      document.getElementById("stats").innerText="🏆 You defeated the dragon!";
-    }
+  if(!playing||player.chicken<=0||player.cool>0)return;
+  let d=Math.hypot(player.x-dragon.x,player.y-dragon.y);
+  if(d<55){
+    player.chicken--;
+    player.cool=25;
+    dragon.hp-=20;
+    score+=25;
+    if(dragon.hp<=0){playing=false;hud.innerHTML="🏆 YOU BEAT THE DRAGON!";}
   }
 }
+
+function hit(a,b){
+  return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+}
+
+function joystick(e){
+  e.preventDefault();
+  let t=e.touches[0];
+  let r=stick.getBoundingClientRect();
+  let cx=r.left+r.width/2, cy=r.top+r.height/2;
+  let dx=t.clientX-cx, dy=t.clientY-cy;
+  let dist=Math.min(45,Math.hypot(dx,dy));
+  let ang=Math.atan2(dy,dx);
+  joyX=Math.cos(ang)*(dist/45);
+  joyY=Math.sin(ang)*(dist/45);
+  knob.style.left=(40+joyX*40)+"px";
+  knob.style.top=(40+joyY*40)+"px";
+}
+stick.addEventListener("touchstart",joystick,{passive:false});
+stick.addEventListener("touchmove",joystick,{passive:false});
+stick.addEventListener("touchend",e=>{
+  joyX=0;joyY=0;knob.style.left="40px";knob.style.top="40px";
+},{passive:false});
 
 function update(){
   if(!playing)return;
+  if(player.cool>0)player.cool--;
+  if(dragon.cool>0)dragon.cool--;
 
-  if(up)player.position.z-=.15;
-  if(down)player.position.z+=.15;
-  if(left)player.position.x-=.15;
-  if(right)player.position.x+=.15;
+  player.x+=joyX*2.1;
+  player.y+=joyY*2.1;
+  player.x=Math.max(4,Math.min(302,player.x));
+  player.y=Math.max(24,Math.min(198,player.y));
 
   chickens=chickens.filter(c=>{
-    if(player.position.distanceTo(c.position)<1){
-      scene.remove(c);
-      chicken++;
-      return false;
-    }
+    if(hit(player,c)){player.chicken++;score+=10;return false;}
     return true;
   });
 
   zombies.forEach(z=>{
-    let dir=new THREE.Vector3().subVectors(player.position,z.position).normalize();
-    z.position.add(dir.multiplyScalar(.035));
-    if(player.position.distanceTo(z.position)<1){
-      health-=.15;
-    }
+    let a=Math.atan2(player.y-z.y,player.x-z.x);
+    z.x+=Math.cos(a)*z.s;
+    z.y+=Math.sin(a)*z.s;
+    if(z.cool>0)z.cool--;
+    if(hit(player,z)&&z.cool<=0){player.hp-=8;z.cool=35;}
   });
 
-  if(health<=0){
-    playing=false;
-    document.getElementById("stats").innerText="💀 Game Over";
-  }else{
-    document.getElementById("stats").innerText=
-      "❤️ Health: "+Math.floor(health)+" | 🍗 Chicken: "+chicken+" | 🐉 Dragon: "+Math.max(0,dragonHealth);
+  if(dragon.cool<=0){
+    let a=Math.atan2(player.y-dragon.y,player.x-dragon.x);
+    fireballs.push({x:dragon.x,y:dragon.y,w:8,h:8,vx:Math.cos(a)*1.8,vy:Math.sin(a)*1.8,life:90});
+    dragon.cool=70;
   }
 
-  camera.position.x=player.position.x;
-  camera.position.z=player.position.z+12;
-  camera.lookAt(player.position);
+  fireballs=fireballs.filter(f=>{
+    f.x+=f.vx;f.y+=f.vy;f.life--;
+    if(hit(player,f)){player.hp-=12;return false;}
+    return f.life>0;
+  });
+
+  if(player.hp<=0){playing=false;hud.innerHTML="💀 GAME OVER";}
+  else hud.innerHTML=`❤️ ${Math.floor(player.hp)} | 🍗 ${player.chicken} | 🐉 ${Math.max(0,dragon.hp)} | ⭐ ${score}`;
 }
 
-function animate(){
-  requestAnimationFrame(animate);
-  update();
-  renderer.render(scene,camera);
+function drawPixelPerson(x,y,shirt,skin){
+  ctx.fillStyle=skin;ctx.fillRect(x+4,y,6,5);
+  ctx.fillStyle="#111";ctx.fillRect(x+3,y+1,8,2);
+  ctx.fillStyle=shirt;ctx.fillRect(x+2,y+6,10,8);
+  ctx.fillStyle="#333";ctx.fillRect(x+1,y+14,4,5);ctx.fillRect(x+9,y+14,4,5);
+  ctx.fillStyle="#222";ctx.fillRect(x,y+7,3,6);ctx.fillRect(x+11,y+7,3,6);
 }
 
-addEventListener("resize",()=>{
-  camera.aspect=innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-});
+function drawChicken(x,y){
+  ctx.fillStyle="#d9822b";ctx.fillRect(x+2,y+2,7,5);
+  ctx.fillStyle="#f6c36a";ctx.fillRect(x+7,y,3,3);
+  ctx.fillStyle="#eee";ctx.fillRect(x,y+4,3,2);
+}
+
+function drawDragon(x,y){
+  ctx.fillStyle="#8b1111";ctx.fillRect(x,y+10,28,16);
+  ctx.fillStyle="#b82020";ctx.fillRect(x+18,y,14,14);
+  ctx.fillStyle="#ffd84a";ctx.fillRect(x+29,y+4,4,3);
+  ctx.fillStyle="#5b0b0b";ctx.fillRect(x+4,y+24,6,8);ctx.fillRect(x+20,y+24,6,8);
+}
+
+function draw(){
+  ctx.clearRect(0,0,320,220);
+
+  for(let y=0;y<220;y+=16)for(let x=0;x<320;x+=16){
+    ctx.fillStyle=((x+y)/16)%2==0?"#2f7d32":"#2b7030";
+    ctx.fillRect(x,y,16,16);
+  }
+
+  ctx.fillStyle="#1d4f24";
+  for(let i=0;i<20;i++)ctx.fillRect((i*47)%320,20+(i*31)%180,8,12);
+
+  chickens.forEach(c=>drawChicken(c.x,c.y));
+  fireballs.forEach(f=>{ctx.fillStyle="#ff6a00";ctx.fillRect(f.x,f.y,8,8)});
+  zombies.forEach(z=>drawPixelPerson(z.x,z.y,"#3f7f3f","#9fd18b"));
+  drawDragon(dragon.x,dragon.y);
+  drawPixelPerson(player.x,player.y,"#3aa6ff","#b9d7b1");
+
+  if(!playing){
+    ctx.fillStyle="rgba(0,0,0,.65)";
+    ctx.fillRect(30,60,260,90);
+    ctx.fillStyle="#ffd84a";
+    ctx.font="18px monospace";
+    ctx.fillText("ZOMBIES R US",88,95);
+    ctx.fillStyle="#fff";
+    ctx.font="12px monospace";
+    ctx.fillText("Tap START to play",95,122);
+  }
+}
+
+function loop(){update();draw();requestAnimationFrame(loop)}
+loop();
 </script>
 </body>
 </html>
