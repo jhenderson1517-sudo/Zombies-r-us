@@ -4,11 +4,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Zombies R US</title>
 <style>
-body{margin:0;background:#090909;color:white;font-family:monospace;text-align:center;overflow:hidden;touch-action:none}
-h1{margin:8px 0 2px;color:#ffd84a;font-size:28px;text-shadow:3px 3px #000}
-#hud{font-size:15px;margin:3px;color:white}
+body{margin:0;background:#070707;color:white;font-family:monospace;text-align:center;overflow:hidden;touch-action:none}
+h1{margin:6px 0 2px;color:#ffd84a;font-size:26px;text-shadow:3px 3px #000}
+#hud{font-size:14px;margin:3px;color:white}
 canvas{image-rendering:pixelated;background:#247c32;border:6px solid #ffd84a;width:96vw;height:62vh}
-#ui{position:fixed;bottom:18px;width:100%;display:flex;justify-content:space-around;align-items:center}
+#ui{position:fixed;bottom:16px;width:100%;display:flex;justify-content:space-around;align-items:center}
 #joy{width:145px;height:145px;border-radius:50%;background:#333;border:6px solid #ffd84a;position:relative;touch-action:none}
 #knob{width:58px;height:58px;border-radius:50%;background:#ffd84a;position:absolute;left:43px;top:43px}
 #attack{width:145px;height:145px;border-radius:50%;background:#c91f1f;color:white;border:6px solid #ffd84a;font-size:25px;font-family:monospace;font-weight:bold;touch-action:none}
@@ -35,78 +35,98 @@ const joy=document.getElementById("joy");
 const knob=document.getElementById("knob");
 const attackBtn=document.getElementById("attack");
 
-let player,dragon,chickens=[],zombies=[],fireballs=[],particles=[];
+let player,dragon,chickens=[],zombies=[],fireballs=[],particles=[],trees=[];
 let joyX=0,joyY=0,playing=false,score=0;
+let sceneX=0,sceneY=0;
 
 function newGame(){
-  player={x:35,y:110,w:14,h:18,hp:100,chicken:0,cool:0,swing:0,faceX:1,faceY:0};
-  dragon={x:260,y:85,w:36,h:36,hp:150,max:150,cool:0};
-  chickens=[];zombies=[];fireballs=[];particles=[];
-  score=0;playing=true;
-  for(let i=0;i<12;i++)addChicken();
-  for(let i=0;i<6;i++)addZombie();
+  sceneX=0; sceneY=0;
+  player={x:155,y:105,w:18,h:24,hp:100,chicken:0,cool:0,swing:0,faceX:1,faceY:0};
+  dragon={x:238,y:82,w:48,h:48,hp:180,max:180,cool:0};
+  score=0; playing=true;
+  loadScene();
+}
+
+function loadScene(){
+  chickens=[];zombies=[];fireballs=[];particles=[];trees=[];
+
+  for(let i=0;i<18;i++){
+    trees.push({x:10+Math.random()*290,y:25+Math.random()*165,w:18,h:26});
+  }
+
+  for(let i=0;i<8;i++){
+    chickens.push({x:30+Math.random()*240,y:35+Math.random()*140,w:14,h:12});
+  }
+
+  let zombieCount=5+Math.abs(sceneX)+Math.abs(sceneY);
+  for(let i=0;i<zombieCount;i++){
+    zombies.push({x:40+Math.random()*230,y:35+Math.random()*145,w:18,h:24,s:.35+Math.random()*.22,cool:0});
+  }
+
+  if(sceneX===2 && sceneY===1){
+    dragon.x=238;dragon.y=82;
+  }
 }
 
 function addChicken(){
-  chickens.push({x:35+Math.random()*220,y:30+Math.random()*155,w:12,h:10});
-}
-
-function addZombie(){
-  zombies.push({x:90+Math.random()*130,y:30+Math.random()*150,w:14,h:18,s:.32+Math.random()*.23,cool:0});
+  chickens.push({x:30+Math.random()*240,y:35+Math.random()*140,w:14,h:12});
 }
 
 function hit(a,b){
  return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 }
 
+function blocked(nx,ny){
+  let temp={x:nx,y:ny,w:player.w,h:player.h};
+  for(let t of trees){
+    if(hit(temp,{x:t.x+2,y:t.y+10,w:t.w-4,h:t.h-10})) return true;
+  }
+  return false;
+}
+
 function boom(x,y,color){
- for(let i=0;i<10;i++){
-   particles.push({x,y,vx:-1+Math.random()*2,vy:-1+Math.random()*2,life:25,c:color});
+ for(let i=0;i<12;i++){
+   particles.push({x,y,vx:-1.3+Math.random()*2.6,vy:-1.3+Math.random()*2.6,life:25,c:color});
  }
 }
 
 function attack(){
  if(!playing||player.cool>0)return;
 
- player.cool=18;
+ player.cool=16;
  player.swing=10;
 
- let swordX=player.x+7+player.faceX*20;
- let swordY=player.y+9+player.faceY*20;
+ let swordX=player.x+9+player.faceX*24;
+ let swordY=player.y+12+player.faceY*24;
 
  zombies=zombies.filter(z=>{
-   let d=Math.hypot(swordX-(z.x+7),swordY-(z.y+9));
-   if(d<22){
-     score+=15;
+   let d=Math.hypot(swordX-(z.x+9),swordY-(z.y+12));
+   if(d<28){
+     score+=20;
      boom(z.x,z.y,"#b6ff7a");
      return false;
    }
    return true;
  });
 
- let d=Math.hypot(swordX-(dragon.x+18),swordY-(dragon.y+18));
- if(d<52){
-   dragon.hp-=18;
-   score+=35;
-   boom(dragon.x+18,dragon.y+18,"#ffd84a");
-   if(dragon.hp<=0){
-     playing=false;
-     hud.innerHTML="🏆 VICTORY! You defeated the dragon!";
+ if(sceneX===2 && sceneY===1){
+   let d=Math.hypot(swordX-(dragon.x+24),swordY-(dragon.y+24));
+   if(d<60){
+     dragon.hp-=16;
+     score+=35;
+     boom(dragon.x+24,dragon.y+24,"#ffd84a");
+     if(dragon.hp<=0){
+       playing=false;
+       hud.innerHTML="🏆 VICTORY! Dragon defeated!";
+     }
    }
  }
 }
 
 document.getElementById("start").onclick=newGame;
 
-attackBtn.addEventListener("touchstart",e=>{
- e.preventDefault();
- attack();
-},{passive:false});
-
-attackBtn.addEventListener("mousedown",e=>{
- e.preventDefault();
- attack();
-});
+attackBtn.addEventListener("touchstart",e=>{e.preventDefault();attack();},{passive:false});
+attackBtn.addEventListener("mousedown",e=>{e.preventDefault();attack();});
 
 function moveJoy(e){
  e.preventDefault();
@@ -132,6 +152,17 @@ joy.addEventListener("touchstart",moveJoy,{passive:false});
 joy.addEventListener("touchmove",moveJoy,{passive:false});
 joy.addEventListener("touchend",stopJoy,{passive:false});
 
+function changeScene(dx,dy){
+  sceneX+=dx; sceneY+=dy;
+
+  if(dx===1) player.x=8;
+  if(dx===-1) player.x=292;
+  if(dy===1) player.y=24;
+  if(dy===-1) player.y=190;
+
+  loadScene();
+}
+
 function update(){
  if(!playing)return;
 
@@ -139,23 +170,28 @@ function update(){
  if(player.swing>0)player.swing--;
  if(dragon.cool>0)dragon.cool--;
 
- player.x+=joyX*1.8;
- player.y+=joyY*1.8;
+ let nx=player.x+joyX*1.9;
+ let ny=player.y+joyY*1.9;
 
  if(Math.abs(joyX)>.1||Math.abs(joyY)>.1){
    player.faceX=joyX;
    player.faceY=joyY;
  }
 
- player.x=Math.max(5,Math.min(300,player.x));
- player.y=Math.max(22,Math.min(198,player.y));
+ if(!blocked(nx,player.y)) player.x=nx;
+ if(!blocked(player.x,ny)) player.y=ny;
+
+ if(player.x<0) changeScene(-1,0);
+ if(player.x>304) changeScene(1,0);
+ if(player.y<20) changeScene(0,-1);
+ if(player.y>202) changeScene(0,1);
 
  chickens=chickens.filter(c=>{
    if(hit(player,c)){
      player.chicken++;
      score+=10;
      boom(c.x,c.y,"#fff06a");
-     if(chickens.length<8)addChicken();
+     if(chickens.length<5)addChicken();
      return false;
    }
    return true;
@@ -167,16 +203,18 @@ function update(){
    z.y+=Math.sin(a)*z.s;
    if(z.cool>0)z.cool--;
    if(hit(player,z)&&z.cool<=0){
-     player.hp-=6;
-     z.cool=35;
+     player.hp-=5;
+     z.cool=40;
      boom(player.x,player.y,"#ff3333");
    }
  });
 
- if(dragon.cool<=0){
-   let a=Math.atan2(player.y-dragon.y,player.x-dragon.x);
-   fireballs.push({x:dragon.x+12,y:dragon.y+12,w:8,h:8,vx:Math.cos(a)*1.55,vy:Math.sin(a)*1.55,life:95});
-   dragon.cool=70;
+ if(sceneX===2 && sceneY===1 && dragon.hp>0){
+   if(dragon.cool<=0){
+     let a=Math.atan2(player.y-dragon.y,player.x-dragon.x);
+     fireballs.push({x:dragon.x+22,y:dragon.y+22,w:9,h:9,vx:Math.cos(a)*1.5,vy:Math.sin(a)*1.5,life:95});
+     dragon.cool=65;
+   }
  }
 
  fireballs=fireballs.filter(f=>{
@@ -197,113 +235,119 @@ function update(){
  if(player.hp<=0){
    player.hp=0;
    playing=false;
-   hud.innerHTML="💀 GAME OVER — Tap START to retry";
+   hud.innerHTML="💀 GAME OVER — Tap START";
  }else{
-   hud.innerHTML=`❤️ ${Math.floor(player.hp)} | 🍗 ${player.chicken} | 🐉 ${Math.max(0,dragon.hp)} | ⭐ ${score}`;
+   hud.innerHTML=`Map ${sceneX},${sceneY} | ❤️ ${Math.floor(player.hp)} | 🍗 ${player.chicken} | 🐉 ${Math.max(0,dragon.hp)} | ⭐ ${score}`;
  }
 }
 
 function grass(){
  for(let y=0;y<220;y+=16){
    for(let x=0;x<320;x+=16){
-     ctx.fillStyle=((x+y)/16)%2===0?"#2d8a35":"#26752e";
+     ctx.fillStyle=((x+y+sceneX*8+sceneY*5)/16)%2===0?"#2d8a35":"#26752e";
      ctx.fillRect(x,y,16,16);
    }
  }
- ctx.fillStyle="#174d22";
- for(let i=0;i<26;i++)ctx.fillRect((i*41)%318,18+(i*29)%190,8,18);
+
+ ctx.fillStyle="#5c3b1e";
+ ctx.fillRect(138,0,44,220);
+ ctx.fillRect(0,92,320,38);
+ ctx.fillStyle="#3c8e3c";
+ ctx.fillRect(140,0,40,220);
+ ctx.fillRect(0,94,320,34);
+}
+
+function treeSprite(x,y){
+ ctx.fillStyle="#4b2b13";
+ ctx.fillRect(x+7,y+15,5,12);
+ ctx.fillStyle="#0f4f24";
+ ctx.fillRect(x+2,y+7,15,12);
+ ctx.fillStyle="#12652d";
+ ctx.fillRect(x,y,19,12);
+ ctx.fillStyle="#1b7c38";
+ ctx.fillRect(x+4,y-5,11,10);
 }
 
 function playerSprite(x,y){
- ctx.fillStyle="#5ee6ff";ctx.fillRect(x+3,y+6,8,9);
- ctx.fillStyle="#b6e8b8";ctx.fillRect(x+4,y,7,6);
- ctx.fillStyle="#143";ctx.fillRect(x+2,y+1,10,2);
- ctx.fillStyle="#113";ctx.fillRect(x+1,y+14,4,5);ctx.fillRect(x+9,y+14,4,5);
- ctx.fillStyle="#000";ctx.fillRect(x+5,y+2,1,1);ctx.fillRect(x+9,y+2,1,1);
+ ctx.fillStyle="#5ee6ff";ctx.fillRect(x+4,y+8,10,11);
+ ctx.fillStyle="#b6e8b8";ctx.fillRect(x+5,y,9,8);
+ ctx.fillStyle="#143";ctx.fillRect(x+3,y+1,13,3);
+ ctx.fillStyle="#113";ctx.fillRect(x+2,y+19,5,6);ctx.fillRect(x+11,y+19,5,6);
+ ctx.fillStyle="#000";ctx.fillRect(x+7,y+3,1,1);ctx.fillRect(x+12,y+3,1,1);
 }
 
 function zombieSprite(x,y){
- ctx.fillStyle="#8fce7a";ctx.fillRect(x+4,y,7,6);
- ctx.fillStyle="#4c8f48";ctx.fillRect(x+2,y+6,10,8);
- ctx.fillStyle="#2a3";ctx.fillRect(x+1,y+14,4,5);ctx.fillRect(x+9,y+14,4,5);
- ctx.fillStyle="#000";ctx.fillRect(x+5,y+2,1,1);ctx.fillRect(x+9,y+2,1,1);
- ctx.fillStyle="#fff";ctx.fillRect(x+6,y+5,4,1);
+ ctx.fillStyle="#8fce7a";ctx.fillRect(x+5,y,9,8);
+ ctx.fillStyle="#4c8f48";ctx.fillRect(x+3,y+8,12,10);
+ ctx.fillStyle="#263";ctx.fillRect(x+2,y+18,5,6);ctx.fillRect(x+12,y+18,5,6);
+ ctx.fillStyle="#000";ctx.fillRect(x+7,y+3,1,1);ctx.fillRect(x+12,y+3,1,1);
+ ctx.fillStyle="#fff";ctx.fillRect(x+7,y+6,5,1);
 }
 
 function chickenSprite(x,y){
- ctx.fillStyle="#d9822b";ctx.fillRect(x+3,y+3,7,5);
- ctx.fillStyle="#f6c36a";ctx.fillRect(x+7,y,4,4);
- ctx.fillStyle="#eee";ctx.fillRect(x,y+5,4,2);
- ctx.fillStyle="#fff";ctx.fillRect(x-1,y+5,2,1);
+ ctx.fillStyle="#d9822b";ctx.fillRect(x+3,y+4,8,6);
+ ctx.fillStyle="#f6c36a";ctx.fillRect(x+8,y,5,5);
+ ctx.fillStyle="#eee";ctx.fillRect(x,y+6,5,3);
 }
 
 function dragonSprite(x,y){
- ctx.fillStyle="#841818";ctx.fillRect(x,y+12,28,16);
- ctx.fillStyle="#b82020";ctx.fillRect(x+18,y+2,15,14);
- ctx.fillStyle="#f7d14a";ctx.fillRect(x+30,y+5,5,3);
- ctx.fillStyle="#5b0b0b";ctx.fillRect(x+4,y+26,6,8);ctx.fillRect(x+20,y+26,6,8);
- ctx.fillStyle="#6e1111";ctx.fillRect(x-7,y+15,8,5);
- ctx.fillStyle="#ffcc33";ctx.fillRect(x+21,y,3,3);
+ ctx.fillStyle="#841818";ctx.fillRect(x,y+16,36,20);
+ ctx.fillStyle="#b82020";ctx.fillRect(x+24,y+4,19,18);
+ ctx.fillStyle="#f7d14a";ctx.fillRect(x+39,y+8,6,4);
+ ctx.fillStyle="#5b0b0b";ctx.fillRect(x+5,y+34,7,10);ctx.fillRect(x+25,y+34,7,10);
+ ctx.fillStyle="#6e1111";ctx.fillRect(x-10,y+19,12,7);
+ ctx.fillStyle="#ffcc33";ctx.fillRect(x+28,y,4,5);
 }
 
 function swordSprite(){
  if(player.swing<=0)return;
-
  ctx.strokeStyle="#e8e8e8";
  ctx.lineWidth=3;
  ctx.beginPath();
- ctx.moveTo(player.x+7,player.y+9);
- ctx.lineTo(player.x+7+player.faceX*23,player.y+9+player.faceY*23);
+ ctx.moveTo(player.x+9,player.y+12);
+ ctx.lineTo(player.x+9+player.faceX*28,player.y+12+player.faceY*28);
  ctx.stroke();
-
  ctx.fillStyle="#ffd84a";
- ctx.fillRect(player.x+5+player.faceX*11,player.y+7+player.faceY*11,5,5);
+ ctx.fillRect(player.x+7+player.faceX*13,player.y+10+player.faceY*13,5,5);
 }
 
 function draw(){
  grass();
 
- ctx.fillStyle="rgba(0,0,0,.25)";
- ctx.fillRect(0,0,320,18);
-
  chickens.forEach(c=>chickenSprite(c.x,c.y));
-
  fireballs.forEach(f=>{
-   ctx.fillStyle="#ff6a00";
-   ctx.fillRect(f.x,f.y,8,8);
-   ctx.fillStyle="#ffd84a";
-   ctx.fillRect(f.x+2,f.y+2,3,3);
+   ctx.fillStyle="#ff6a00";ctx.fillRect(f.x,f.y,9,9);
+   ctx.fillStyle="#ffd84a";ctx.fillRect(f.x+2,f.y+2,4,4);
  });
 
  zombies.forEach(z=>zombieSprite(z.x,z.y));
- dragonSprite(dragon.x,dragon.y);
+
+ if(sceneX===2 && sceneY===1 && dragon.hp>0) dragonSprite(dragon.x,dragon.y);
+
  playerSprite(player.x,player.y);
  swordSprite();
 
- particles.forEach(p=>{
-   ctx.fillStyle=p.c;
-   ctx.fillRect(p.x,p.y,3,3);
- });
+ trees.forEach(t=>treeSprite(t.x,t.y));
 
- ctx.fillStyle="#4d0b0b";
- ctx.fillRect(200,5,100,7);
- ctx.fillStyle="#e53939";
- ctx.fillRect(200,5,100*(dragon.hp/dragon.max),7);
- ctx.strokeStyle="#fff";
- ctx.strokeRect(200,5,100,7);
+ particles.forEach(p=>{ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,3,3)});
+
+ ctx.fillStyle="rgba(0,0,0,.35)";
+ ctx.fillRect(0,0,320,18);
+
+ if(sceneX===2 && sceneY===1){
+   ctx.fillStyle="#4d0b0b";ctx.fillRect(200,5,100,7);
+   ctx.fillStyle="#e53939";ctx.fillRect(200,5,100*(dragon.hp/dragon.max),7);
+   ctx.strokeStyle="#fff";ctx.strokeRect(200,5,100,7);
+ }
 
  if(!playing){
    ctx.fillStyle="rgba(0,0,0,.68)";
-   ctx.fillRect(35,58,250,100);
-   ctx.strokeStyle="#ffd84a";
-   ctx.strokeRect(35,58,250,100);
-   ctx.fillStyle="#ffd84a";
-   ctx.font="18px monospace";
-   ctx.fillText("ZOMBIES R US",86,95);
-   ctx.fillStyle="#fff";
-   ctx.font="12px monospace";
-   ctx.fillText("Left thumb moves",104,122);
-   ctx.fillText("Right thumb swings sword",78,140);
+   ctx.fillRect(35,58,250,104);
+   ctx.strokeStyle="#ffd84a";ctx.strokeRect(35,58,250,104);
+   ctx.fillStyle="#ffd84a";ctx.font="18px monospace";ctx.fillText("ZOMBIES R US",86,93);
+   ctx.fillStyle="#fff";ctx.font="12px monospace";
+   ctx.fillText("Explore screen to screen",76,120);
+   ctx.fillText("Dragon is at Map 2,1",88,138);
  }
 }
 
