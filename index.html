@@ -9,11 +9,10 @@ h1{margin:8px 0 2px;color:#ffd84a;font-size:28px;text-shadow:3px 3px #000}
 #hud{font-size:15px;margin:3px;color:white}
 canvas{image-rendering:pixelated;background:#247c32;border:6px solid #ffd84a;width:96vw;height:62vh}
 #ui{position:fixed;bottom:18px;width:100%;display:flex;justify-content:space-around;align-items:center}
-#joy{width:145px;height:145px;border-radius:50%;background:#333;border:6px solid #ffd84a;position:relative}
+#joy{width:145px;height:145px;border-radius:50%;background:#333;border:6px solid #ffd84a;position:relative;touch-action:none}
 #knob{width:58px;height:58px;border-radius:50%;background:#ffd84a;position:absolute;left:43px;top:43px}
-button{font-family:monospace;font-weight:bold}
-#start{padding:10px 22px;border-radius:18px}
-#attack{width:145px;height:145px;border-radius:50%;background:#c91f1f;color:white;border:6px solid #ffd84a;font-size:28px}
+#attack{width:145px;height:145px;border-radius:50%;background:#c91f1f;color:white;border:6px solid #ffd84a;font-size:25px;font-family:monospace;font-weight:bold;touch-action:none}
+#start{padding:10px 22px;border-radius:18px;font-family:monospace;font-weight:bold}
 </style>
 </head>
 <body>
@@ -25,7 +24,7 @@ button{font-family:monospace;font-weight:bold}
 <div id="ui">
   <div id="joy"><div id="knob"></div></div>
   <button id="start">START</button>
-  <button id="attack">ATTACK</button>
+  <button id="attack">⚔️ ATTACK</button>
 </div>
 
 <script>
@@ -34,15 +33,16 @@ const ctx=canvas.getContext("2d");
 const hud=document.getElementById("hud");
 const joy=document.getElementById("joy");
 const knob=document.getElementById("knob");
+const attackBtn=document.getElementById("attack");
 
 let player,dragon,chickens=[],zombies=[],fireballs=[],particles=[];
-let joyX=0,joyY=0,playing=false,score=0,wave=1;
+let joyX=0,joyY=0,playing=false,score=0;
 
 function newGame(){
-  player={x:35,y:110,w:14,h:18,hp:100,chicken:0,cool:0};
+  player={x:35,y:110,w:14,h:18,hp:100,chicken:0,cool:0,swing:0,faceX:1,faceY:0};
   dragon={x:260,y:85,w:36,h:36,hp:150,max:150,cool:0};
   chickens=[];zombies=[];fireballs=[];particles=[];
-  score=0;wave=1;playing=true;
+  score=0;playing=true;
   for(let i=0;i<12;i++)addChicken();
   for(let i=0;i<6;i++)addZombie();
 }
@@ -52,7 +52,7 @@ function addChicken(){
 }
 
 function addZombie(){
-  zombies.push({x:90+Math.random()*130,y:30+Math.random()*150,w:14,h:18,s:.35+Math.random()*.25,cool:0});
+  zombies.push({x:90+Math.random()*130,y:30+Math.random()*150,w:14,h:18,s:.32+Math.random()*.23,cool:0});
 }
 
 function hit(a,b){
@@ -60,27 +60,53 @@ function hit(a,b){
 }
 
 function boom(x,y,color){
- for(let i=0;i<10;i++)particles.push({x,y,vx:-1+Math.random()*2,vy:-1+Math.random()*2,life:25,c:color});
+ for(let i=0;i<10;i++){
+   particles.push({x,y,vx:-1+Math.random()*2,vy:-1+Math.random()*2,life:25,c:color});
+ }
 }
 
 function attack(){
- if(!playing||player.chicken<=0||player.cool>0)return;
- let d=Math.hypot(player.x-dragon.x,player.y-dragon.y);
- if(d<65){
-   player.chicken--;
-   player.cool=25;
-   dragon.hp-=20;
-   score+=50;
+ if(!playing||player.cool>0)return;
+
+ player.cool=18;
+ player.swing=10;
+
+ let swordX=player.x+7+player.faceX*20;
+ let swordY=player.y+9+player.faceY*20;
+
+ zombies=zombies.filter(z=>{
+   let d=Math.hypot(swordX-(z.x+7),swordY-(z.y+9));
+   if(d<22){
+     score+=15;
+     boom(z.x,z.y,"#b6ff7a");
+     return false;
+   }
+   return true;
+ });
+
+ let d=Math.hypot(swordX-(dragon.x+18),swordY-(dragon.y+18));
+ if(d<52){
+   dragon.hp-=18;
+   score+=35;
    boom(dragon.x+18,dragon.y+18,"#ffd84a");
    if(dragon.hp<=0){
      playing=false;
-     hud.innerHTML="🏆 VICTORY! You saved the fried chicken recipe!";
+     hud.innerHTML="🏆 VICTORY! You defeated the dragon!";
    }
  }
 }
 
 document.getElementById("start").onclick=newGame;
-document.getElementById("attack").onclick=attack;
+
+attackBtn.addEventListener("touchstart",e=>{
+ e.preventDefault();
+ attack();
+},{passive:false});
+
+attackBtn.addEventListener("mousedown",e=>{
+ e.preventDefault();
+ attack();
+});
 
 function moveJoy(e){
  e.preventDefault();
@@ -95,21 +121,32 @@ function moveJoy(e){
  knob.style.left=(43+joyX*43)+"px";
  knob.style.top=(43+joyY*43)+"px";
 }
+
 function stopJoy(){
  joyX=0;joyY=0;
- knob.style.left="43px";knob.style.top="43px";
+ knob.style.left="43px";
+ knob.style.top="43px";
 }
+
 joy.addEventListener("touchstart",moveJoy,{passive:false});
 joy.addEventListener("touchmove",moveJoy,{passive:false});
 joy.addEventListener("touchend",stopJoy,{passive:false});
 
 function update(){
  if(!playing)return;
+
  if(player.cool>0)player.cool--;
+ if(player.swing>0)player.swing--;
  if(dragon.cool>0)dragon.cool--;
 
  player.x+=joyX*1.8;
  player.y+=joyY*1.8;
+
+ if(Math.abs(joyX)>.1||Math.abs(joyY)>.1){
+   player.faceX=joyX;
+   player.faceY=joyY;
+ }
+
  player.x=Math.max(5,Math.min(300,player.x));
  player.y=Math.max(22,Math.min(198,player.y));
 
@@ -130,7 +167,7 @@ function update(){
    z.y+=Math.sin(a)*z.s;
    if(z.cool>0)z.cool--;
    if(hit(player,z)&&z.cool<=0){
-     player.hp-=7;
+     player.hp-=6;
      z.cool=35;
      boom(player.x,player.y,"#ff3333");
    }
@@ -138,13 +175,17 @@ function update(){
 
  if(dragon.cool<=0){
    let a=Math.atan2(player.y-dragon.y,player.x-dragon.x);
-   fireballs.push({x:dragon.x+12,y:dragon.y+12,w:8,h:8,vx:Math.cos(a)*1.7,vy:Math.sin(a)*1.7,life:95});
-   dragon.cool=65;
+   fireballs.push({x:dragon.x+12,y:dragon.y+12,w:8,h:8,vx:Math.cos(a)*1.55,vy:Math.sin(a)*1.55,life:95});
+   dragon.cool=70;
  }
 
  fireballs=fireballs.filter(f=>{
    f.x+=f.vx;f.y+=f.vy;f.life--;
-   if(hit(player,f)){player.hp-=12;boom(f.x,f.y,"#ff7a00");return false;}
+   if(hit(player,f)){
+     player.hp-=10;
+     boom(f.x,f.y,"#ff7a00");
+     return false;
+   }
    return f.life>0;
  });
 
@@ -205,6 +246,20 @@ function dragonSprite(x,y){
  ctx.fillStyle="#ffcc33";ctx.fillRect(x+21,y,3,3);
 }
 
+function swordSprite(){
+ if(player.swing<=0)return;
+
+ ctx.strokeStyle="#e8e8e8";
+ ctx.lineWidth=3;
+ ctx.beginPath();
+ ctx.moveTo(player.x+7,player.y+9);
+ ctx.lineTo(player.x+7+player.faceX*23,player.y+9+player.faceY*23);
+ ctx.stroke();
+
+ ctx.fillStyle="#ffd84a";
+ ctx.fillRect(player.x+5+player.faceX*11,player.y+7+player.faceY*11,5,5);
+}
+
 function draw(){
  grass();
 
@@ -212,24 +267,43 @@ function draw(){
  ctx.fillRect(0,0,320,18);
 
  chickens.forEach(c=>chickenSprite(c.x,c.y));
- fireballs.forEach(f=>{ctx.fillStyle="#ff6a00";ctx.fillRect(f.x,f.y,8,8);ctx.fillStyle="#ffd84a";ctx.fillRect(f.x+2,f.y+2,3,3)});
+
+ fireballs.forEach(f=>{
+   ctx.fillStyle="#ff6a00";
+   ctx.fillRect(f.x,f.y,8,8);
+   ctx.fillStyle="#ffd84a";
+   ctx.fillRect(f.x+2,f.y+2,3,3);
+ });
+
  zombies.forEach(z=>zombieSprite(z.x,z.y));
  dragonSprite(dragon.x,dragon.y);
  playerSprite(player.x,player.y);
+ swordSprite();
 
- particles.forEach(p=>{ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,3,3)});
+ particles.forEach(p=>{
+   ctx.fillStyle=p.c;
+   ctx.fillRect(p.x,p.y,3,3);
+ });
 
- ctx.fillStyle="#4d0b0b";ctx.fillRect(200,5,100,7);
- ctx.fillStyle="#e53939";ctx.fillRect(200,5,100*(dragon.hp/dragon.max),7);
- ctx.strokeStyle="#fff";ctx.strokeRect(200,5,100,7);
+ ctx.fillStyle="#4d0b0b";
+ ctx.fillRect(200,5,100,7);
+ ctx.fillStyle="#e53939";
+ ctx.fillRect(200,5,100*(dragon.hp/dragon.max),7);
+ ctx.strokeStyle="#fff";
+ ctx.strokeRect(200,5,100,7);
 
  if(!playing){
    ctx.fillStyle="rgba(0,0,0,.68)";
    ctx.fillRect(35,58,250,100);
-   ctx.strokeStyle="#ffd84a";ctx.strokeRect(35,58,250,100);
-   ctx.fillStyle="#ffd84a";ctx.font="18px monospace";ctx.fillText("ZOMBIES R US",86,95);
-   ctx.fillStyle="#fff";ctx.font="12px monospace";ctx.fillText("Move with joystick",100,122);
-   ctx.fillText("Collect chicken. Attack dragon.",66,140);
+   ctx.strokeStyle="#ffd84a";
+   ctx.strokeRect(35,58,250,100);
+   ctx.fillStyle="#ffd84a";
+   ctx.font="18px monospace";
+   ctx.fillText("ZOMBIES R US",86,95);
+   ctx.fillStyle="#fff";
+   ctx.font="12px monospace";
+   ctx.fillText("Left thumb moves",104,122);
+   ctx.fillText("Right thumb swings sword",78,140);
  }
 }
 
