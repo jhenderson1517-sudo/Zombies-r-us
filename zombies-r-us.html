@@ -67,6 +67,12 @@ const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
 const keys = {};
+
+ let touchUp = false;
+let touchDown = false;
+let touchLeft = false;
+let touchRight = false;
+let touchAttack = false;
 let state = 'title';
 let message = '';
 let frame = 0;
