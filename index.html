@@ -4,25 +4,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Zombies R US</title>
 <style>
-body{margin:0;background:#101010;color:white;font-family:monospace;text-align:center;overflow:hidden;touch-action:none}
-h1{font-size:26px;margin:8px;color:#ffd84a;text-shadow:3px 3px #000}
-canvas{image-rendering:pixelated;background:#2f7d32;border:6px solid #ffd84a;width:96vw;height:62vh}
-#hud{font-size:16px;margin:4px;color:#fff}
-#controls{position:fixed;bottom:18px;width:100%;display:flex;justify-content:space-around;align-items:center}
-#stick{width:130px;height:130px;border-radius:50%;background:#333;border:4px solid #ffd84a;position:relative}
-#knob{width:50px;height:50px;border-radius:50%;background:#ffd84a;position:absolute;left:40px;top:40px}
-#attack{width:120px;height:120px;border-radius:50%;background:#b82020;color:white;font-size:22px;border:5px solid #ffd84a}
-button{font-family:monospace}
+body{margin:0;background:#090909;color:white;font-family:monospace;text-align:center;overflow:hidden;touch-action:none}
+h1{margin:8px 0 2px;color:#ffd84a;font-size:28px;text-shadow:3px 3px #000}
+#hud{font-size:15px;margin:3px;color:white}
+canvas{image-rendering:pixelated;background:#247c32;border:6px solid #ffd84a;width:96vw;height:62vh}
+#ui{position:fixed;bottom:18px;width:100%;display:flex;justify-content:space-around;align-items:center}
+#joy{width:145px;height:145px;border-radius:50%;background:#333;border:6px solid #ffd84a;position:relative}
+#knob{width:58px;height:58px;border-radius:50%;background:#ffd84a;position:absolute;left:43px;top:43px}
+button{font-family:monospace;font-weight:bold}
+#start{padding:10px 22px;border-radius:18px}
+#attack{width:145px;height:145px;border-radius:50%;background:#c91f1f;color:white;border:6px solid #ffd84a;font-size:28px}
 </style>
 </head>
 <body>
 
 <h1>🧟 Zombies R US 🍗🐉</h1>
-<div id="hud">Tap START</div>
+<div id="hud">Loading...</div>
 <canvas id="game" width="320" height="220"></canvas>
 
-<div id="controls">
-  <div id="stick"><div id="knob"></div></div>
+<div id="ui">
+  <div id="joy"><div id="knob"></div></div>
   <button id="start">START</button>
   <button id="attack">ATTACK</button>
 </div>
@@ -31,149 +32,214 @@ button{font-family:monospace}
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 const hud=document.getElementById("hud");
-const stick=document.getElementById("stick");
+const joy=document.getElementById("joy");
 const knob=document.getElementById("knob");
 
-let joyX=0, joyY=0, playing=false;
-let player, dragon, chickens=[], zombies=[], fireballs=[];
-let score=0;
+let player,dragon,chickens=[],zombies=[],fireballs=[],particles=[];
+let joyX=0,joyY=0,playing=false,score=0,wave=1;
 
-function reset(){
+function newGame(){
   player={x:35,y:110,w:14,h:18,hp:100,chicken:0,cool:0};
-  dragon={x:265,y:85,w:34,h:34,hp:120,cool:0};
-  chickens=[]; zombies=[]; fireballs=[]; score=0; playing=true;
-  for(let i=0;i<10;i++) chickens.push({x:50+Math.random()*180,y:35+Math.random()*140,w:10,h:10});
-  for(let i=0;i<5;i++) zombies.push({x:90+Math.random()*130,y:30+Math.random()*150,w:14,h:18,s:.45,cool:0});
+  dragon={x:260,y:85,w:36,h:36,hp:150,max:150,cool:0};
+  chickens=[];zombies=[];fireballs=[];particles=[];
+  score=0;wave=1;playing=true;
+  for(let i=0;i<12;i++)addChicken();
+  for(let i=0;i<6;i++)addZombie();
 }
 
-document.getElementById("start").onclick=reset;
-document.getElementById("attack").onclick=attack;
+function addChicken(){
+  chickens.push({x:35+Math.random()*220,y:30+Math.random()*155,w:12,h:10});
+}
 
-function attack(){
-  if(!playing||player.chicken<=0||player.cool>0)return;
-  let d=Math.hypot(player.x-dragon.x,player.y-dragon.y);
-  if(d<55){
-    player.chicken--;
-    player.cool=25;
-    dragon.hp-=20;
-    score+=25;
-    if(dragon.hp<=0){playing=false;hud.innerHTML="🏆 YOU BEAT THE DRAGON!";}
-  }
+function addZombie(){
+  zombies.push({x:90+Math.random()*130,y:30+Math.random()*150,w:14,h:18,s:.35+Math.random()*.25,cool:0});
 }
 
 function hit(a,b){
-  return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+ return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 }
 
-function joystick(e){
-  e.preventDefault();
-  let t=e.touches[0];
-  let r=stick.getBoundingClientRect();
-  let cx=r.left+r.width/2, cy=r.top+r.height/2;
-  let dx=t.clientX-cx, dy=t.clientY-cy;
-  let dist=Math.min(45,Math.hypot(dx,dy));
-  let ang=Math.atan2(dy,dx);
-  joyX=Math.cos(ang)*(dist/45);
-  joyY=Math.sin(ang)*(dist/45);
-  knob.style.left=(40+joyX*40)+"px";
-  knob.style.top=(40+joyY*40)+"px";
+function boom(x,y,color){
+ for(let i=0;i<10;i++)particles.push({x,y,vx:-1+Math.random()*2,vy:-1+Math.random()*2,life:25,c:color});
 }
-stick.addEventListener("touchstart",joystick,{passive:false});
-stick.addEventListener("touchmove",joystick,{passive:false});
-stick.addEventListener("touchend",e=>{
-  joyX=0;joyY=0;knob.style.left="40px";knob.style.top="40px";
-},{passive:false});
+
+function attack(){
+ if(!playing||player.chicken<=0||player.cool>0)return;
+ let d=Math.hypot(player.x-dragon.x,player.y-dragon.y);
+ if(d<65){
+   player.chicken--;
+   player.cool=25;
+   dragon.hp-=20;
+   score+=50;
+   boom(dragon.x+18,dragon.y+18,"#ffd84a");
+   if(dragon.hp<=0){
+     playing=false;
+     hud.innerHTML="🏆 VICTORY! You saved the fried chicken recipe!";
+   }
+ }
+}
+
+document.getElementById("start").onclick=newGame;
+document.getElementById("attack").onclick=attack;
+
+function moveJoy(e){
+ e.preventDefault();
+ const t=e.touches?e.touches[0]:e;
+ const r=joy.getBoundingClientRect();
+ const cx=r.left+r.width/2,cy=r.top+r.height/2;
+ let dx=t.clientX-cx,dy=t.clientY-cy;
+ let dist=Math.min(48,Math.hypot(dx,dy));
+ let ang=Math.atan2(dy,dx);
+ joyX=Math.cos(ang)*(dist/48);
+ joyY=Math.sin(ang)*(dist/48);
+ knob.style.left=(43+joyX*43)+"px";
+ knob.style.top=(43+joyY*43)+"px";
+}
+function stopJoy(){
+ joyX=0;joyY=0;
+ knob.style.left="43px";knob.style.top="43px";
+}
+joy.addEventListener("touchstart",moveJoy,{passive:false});
+joy.addEventListener("touchmove",moveJoy,{passive:false});
+joy.addEventListener("touchend",stopJoy,{passive:false});
 
 function update(){
-  if(!playing)return;
-  if(player.cool>0)player.cool--;
-  if(dragon.cool>0)dragon.cool--;
+ if(!playing)return;
+ if(player.cool>0)player.cool--;
+ if(dragon.cool>0)dragon.cool--;
 
-  player.x+=joyX*2.1;
-  player.y+=joyY*2.1;
-  player.x=Math.max(4,Math.min(302,player.x));
-  player.y=Math.max(24,Math.min(198,player.y));
+ player.x+=joyX*1.8;
+ player.y+=joyY*1.8;
+ player.x=Math.max(5,Math.min(300,player.x));
+ player.y=Math.max(22,Math.min(198,player.y));
 
-  chickens=chickens.filter(c=>{
-    if(hit(player,c)){player.chicken++;score+=10;return false;}
-    return true;
-  });
+ chickens=chickens.filter(c=>{
+   if(hit(player,c)){
+     player.chicken++;
+     score+=10;
+     boom(c.x,c.y,"#fff06a");
+     if(chickens.length<8)addChicken();
+     return false;
+   }
+   return true;
+ });
 
-  zombies.forEach(z=>{
-    let a=Math.atan2(player.y-z.y,player.x-z.x);
-    z.x+=Math.cos(a)*z.s;
-    z.y+=Math.sin(a)*z.s;
-    if(z.cool>0)z.cool--;
-    if(hit(player,z)&&z.cool<=0){player.hp-=8;z.cool=35;}
-  });
+ zombies.forEach(z=>{
+   let a=Math.atan2(player.y-z.y,player.x-z.x);
+   z.x+=Math.cos(a)*z.s;
+   z.y+=Math.sin(a)*z.s;
+   if(z.cool>0)z.cool--;
+   if(hit(player,z)&&z.cool<=0){
+     player.hp-=7;
+     z.cool=35;
+     boom(player.x,player.y,"#ff3333");
+   }
+ });
 
-  if(dragon.cool<=0){
-    let a=Math.atan2(player.y-dragon.y,player.x-dragon.x);
-    fireballs.push({x:dragon.x,y:dragon.y,w:8,h:8,vx:Math.cos(a)*1.8,vy:Math.sin(a)*1.8,life:90});
-    dragon.cool=70;
-  }
+ if(dragon.cool<=0){
+   let a=Math.atan2(player.y-dragon.y,player.x-dragon.x);
+   fireballs.push({x:dragon.x+12,y:dragon.y+12,w:8,h:8,vx:Math.cos(a)*1.7,vy:Math.sin(a)*1.7,life:95});
+   dragon.cool=65;
+ }
 
-  fireballs=fireballs.filter(f=>{
-    f.x+=f.vx;f.y+=f.vy;f.life--;
-    if(hit(player,f)){player.hp-=12;return false;}
-    return f.life>0;
-  });
+ fireballs=fireballs.filter(f=>{
+   f.x+=f.vx;f.y+=f.vy;f.life--;
+   if(hit(player,f)){player.hp-=12;boom(f.x,f.y,"#ff7a00");return false;}
+   return f.life>0;
+ });
 
-  if(player.hp<=0){playing=false;hud.innerHTML="💀 GAME OVER";}
-  else hud.innerHTML=`❤️ ${Math.floor(player.hp)} | 🍗 ${player.chicken} | 🐉 ${Math.max(0,dragon.hp)} | ⭐ ${score}`;
+ particles=particles.filter(p=>{
+   p.x+=p.vx;p.y+=p.vy;p.life--;
+   return p.life>0;
+ });
+
+ if(player.hp<=0){
+   player.hp=0;
+   playing=false;
+   hud.innerHTML="💀 GAME OVER — Tap START to retry";
+ }else{
+   hud.innerHTML=`❤️ ${Math.floor(player.hp)} | 🍗 ${player.chicken} | 🐉 ${Math.max(0,dragon.hp)} | ⭐ ${score}`;
+ }
 }
 
-function drawPixelPerson(x,y,shirt,skin){
-  ctx.fillStyle=skin;ctx.fillRect(x+4,y,6,5);
-  ctx.fillStyle="#111";ctx.fillRect(x+3,y+1,8,2);
-  ctx.fillStyle=shirt;ctx.fillRect(x+2,y+6,10,8);
-  ctx.fillStyle="#333";ctx.fillRect(x+1,y+14,4,5);ctx.fillRect(x+9,y+14,4,5);
-  ctx.fillStyle="#222";ctx.fillRect(x,y+7,3,6);ctx.fillRect(x+11,y+7,3,6);
+function grass(){
+ for(let y=0;y<220;y+=16){
+   for(let x=0;x<320;x+=16){
+     ctx.fillStyle=((x+y)/16)%2===0?"#2d8a35":"#26752e";
+     ctx.fillRect(x,y,16,16);
+   }
+ }
+ ctx.fillStyle="#174d22";
+ for(let i=0;i<26;i++)ctx.fillRect((i*41)%318,18+(i*29)%190,8,18);
 }
 
-function drawChicken(x,y){
-  ctx.fillStyle="#d9822b";ctx.fillRect(x+2,y+2,7,5);
-  ctx.fillStyle="#f6c36a";ctx.fillRect(x+7,y,3,3);
-  ctx.fillStyle="#eee";ctx.fillRect(x,y+4,3,2);
+function playerSprite(x,y){
+ ctx.fillStyle="#5ee6ff";ctx.fillRect(x+3,y+6,8,9);
+ ctx.fillStyle="#b6e8b8";ctx.fillRect(x+4,y,7,6);
+ ctx.fillStyle="#143";ctx.fillRect(x+2,y+1,10,2);
+ ctx.fillStyle="#113";ctx.fillRect(x+1,y+14,4,5);ctx.fillRect(x+9,y+14,4,5);
+ ctx.fillStyle="#000";ctx.fillRect(x+5,y+2,1,1);ctx.fillRect(x+9,y+2,1,1);
 }
 
-function drawDragon(x,y){
-  ctx.fillStyle="#8b1111";ctx.fillRect(x,y+10,28,16);
-  ctx.fillStyle="#b82020";ctx.fillRect(x+18,y,14,14);
-  ctx.fillStyle="#ffd84a";ctx.fillRect(x+29,y+4,4,3);
-  ctx.fillStyle="#5b0b0b";ctx.fillRect(x+4,y+24,6,8);ctx.fillRect(x+20,y+24,6,8);
+function zombieSprite(x,y){
+ ctx.fillStyle="#8fce7a";ctx.fillRect(x+4,y,7,6);
+ ctx.fillStyle="#4c8f48";ctx.fillRect(x+2,y+6,10,8);
+ ctx.fillStyle="#2a3";ctx.fillRect(x+1,y+14,4,5);ctx.fillRect(x+9,y+14,4,5);
+ ctx.fillStyle="#000";ctx.fillRect(x+5,y+2,1,1);ctx.fillRect(x+9,y+2,1,1);
+ ctx.fillStyle="#fff";ctx.fillRect(x+6,y+5,4,1);
+}
+
+function chickenSprite(x,y){
+ ctx.fillStyle="#d9822b";ctx.fillRect(x+3,y+3,7,5);
+ ctx.fillStyle="#f6c36a";ctx.fillRect(x+7,y,4,4);
+ ctx.fillStyle="#eee";ctx.fillRect(x,y+5,4,2);
+ ctx.fillStyle="#fff";ctx.fillRect(x-1,y+5,2,1);
+}
+
+function dragonSprite(x,y){
+ ctx.fillStyle="#841818";ctx.fillRect(x,y+12,28,16);
+ ctx.fillStyle="#b82020";ctx.fillRect(x+18,y+2,15,14);
+ ctx.fillStyle="#f7d14a";ctx.fillRect(x+30,y+5,5,3);
+ ctx.fillStyle="#5b0b0b";ctx.fillRect(x+4,y+26,6,8);ctx.fillRect(x+20,y+26,6,8);
+ ctx.fillStyle="#6e1111";ctx.fillRect(x-7,y+15,8,5);
+ ctx.fillStyle="#ffcc33";ctx.fillRect(x+21,y,3,3);
 }
 
 function draw(){
-  ctx.clearRect(0,0,320,220);
+ grass();
 
-  for(let y=0;y<220;y+=16)for(let x=0;x<320;x+=16){
-    ctx.fillStyle=((x+y)/16)%2==0?"#2f7d32":"#2b7030";
-    ctx.fillRect(x,y,16,16);
-  }
+ ctx.fillStyle="rgba(0,0,0,.25)";
+ ctx.fillRect(0,0,320,18);
 
-  ctx.fillStyle="#1d4f24";
-  for(let i=0;i<20;i++)ctx.fillRect((i*47)%320,20+(i*31)%180,8,12);
+ chickens.forEach(c=>chickenSprite(c.x,c.y));
+ fireballs.forEach(f=>{ctx.fillStyle="#ff6a00";ctx.fillRect(f.x,f.y,8,8);ctx.fillStyle="#ffd84a";ctx.fillRect(f.x+2,f.y+2,3,3)});
+ zombies.forEach(z=>zombieSprite(z.x,z.y));
+ dragonSprite(dragon.x,dragon.y);
+ playerSprite(player.x,player.y);
 
-  chickens.forEach(c=>drawChicken(c.x,c.y));
-  fireballs.forEach(f=>{ctx.fillStyle="#ff6a00";ctx.fillRect(f.x,f.y,8,8)});
-  zombies.forEach(z=>drawPixelPerson(z.x,z.y,"#3f7f3f","#9fd18b"));
-  drawDragon(dragon.x,dragon.y);
-  drawPixelPerson(player.x,player.y,"#3aa6ff","#b9d7b1");
+ particles.forEach(p=>{ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,3,3)});
 
-  if(!playing){
-    ctx.fillStyle="rgba(0,0,0,.65)";
-    ctx.fillRect(30,60,260,90);
-    ctx.fillStyle="#ffd84a";
-    ctx.font="18px monospace";
-    ctx.fillText("ZOMBIES R US",88,95);
-    ctx.fillStyle="#fff";
-    ctx.font="12px monospace";
-    ctx.fillText("Tap START to play",95,122);
-  }
+ ctx.fillStyle="#4d0b0b";ctx.fillRect(200,5,100,7);
+ ctx.fillStyle="#e53939";ctx.fillRect(200,5,100*(dragon.hp/dragon.max),7);
+ ctx.strokeStyle="#fff";ctx.strokeRect(200,5,100,7);
+
+ if(!playing){
+   ctx.fillStyle="rgba(0,0,0,.68)";
+   ctx.fillRect(35,58,250,100);
+   ctx.strokeStyle="#ffd84a";ctx.strokeRect(35,58,250,100);
+   ctx.fillStyle="#ffd84a";ctx.font="18px monospace";ctx.fillText("ZOMBIES R US",86,95);
+   ctx.fillStyle="#fff";ctx.font="12px monospace";ctx.fillText("Move with joystick",100,122);
+   ctx.fillText("Collect chicken. Attack dragon.",66,140);
+ }
 }
 
-function loop(){update();draw();requestAnimationFrame(loop)}
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+
+newGame();
 loop();
 </script>
 </body>
