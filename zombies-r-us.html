@@ -170,11 +170,11 @@ function update() {
   if (dragon.fireCooldown > 0) dragon.fireCooldown--;
 
   let dx = 0, dy = 0;
-  if (keys['arrowup'] || keys['w']) dy -= 1;
-  if (keys['arrowdown'] || keys['s']) dy += 1;
-  if (keys['arrowleft'] || keys['a']) dx -= 1;
-  if (keys['arrowright'] || keys['d']) dx += 1;
-  if (dx || dy) {
+  if (keys['arrowup'] || keys['w'] || touchUp) dy -= 1;
+if (keys['arrowdown'] || keys['s'] || touchDown) dy += 1;
+if (keys['arrowleft'] || keys['a'] || touchLeft) dx -= 1;
+if (keys['arrowright'] || keys['d'] || touchRight) dx += 1;
+ 
     const mag = Math.hypot(dx, dy);
     player.x += (dx / mag) * player.speed;
     player.y += (dy / mag) * player.speed;
@@ -339,13 +339,40 @@ function drawOverlay(title, action, sub) {
   ctx.textAlign = 'left';
 }
 
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
 
-loop();
+  if (state === 'title' || state === 'gameover' || state === 'win') {
+    resetGame();
+    return;
+  }
+
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = t.clientX - rect.left;
+  const y = t.clientY - rect.top;
+  const cw = rect.width;
+  const ch = rect.height;
+
+  touchUp = y < ch * 0.35;
+  touchDown = y > ch * 0.65;
+  touchLeft = x < cw * 0.35;
+  touchRight = x > cw * 0.65;
+
+  if (x > cw * 0.68 && y > ch * 0.55) {
+    touchAttack = true;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  touchUp = false;
+  touchDown = false;
+  touchLeft = false;
+  touchRight = false;
+  touchAttack = false;
+}, { passive: false });
+ 
 </script>
 </body>
 </html>
